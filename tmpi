@@ -55,6 +55,16 @@ if [[ ${1} == runmpi ]] ; then
     # we are being started as one of many processes by mpirun.
     shift
 
+    if [[ "x${OMPI_COMM_WORLD_RANK}" != "x" ]]; then
+        # OpenMPI
+        COMM_WORLD_RANK=${OMPI_COMM_WORLD_RANK}
+    elif [[ "x${PMI_RANK}" != "x" ]]; then
+        # MPICH and derivatives
+        COMM_WORLD_RANK=${PMI_RANK}
+    else
+        echo 'Unable to determine rank (not using OpenMPI or MPICH)'
+        exit 1
+    fi
     # start the processes in the order of their rank.
     # this avoids races, as we have to push the variables in tmux' environment.
     # it has the nice side-effect that the panes are also ordered by rank.
@@ -63,7 +73,7 @@ if [[ ${1} == runmpi ]] ; then
     done
 
     # get all the variables that mpirun starts us with so that we can pass them through.
-    mpi_vars=( $( env | grep -e MPI -e OPAL -e PMIX | cut -d '=' -f1 ) )
+    mpi_vars=( $( env | grep -e MPI -e OPAL -e PMIX -e HYDRA -e PMI -e HYDI -e GFORTRAN | cut -d '=' -f1 ) )
     mpi_vars+=( "${additional_vars[@]}" )
 
     # add the variables to tmux' session environment.
@@ -81,7 +91,7 @@ if [[ ${1} == runmpi ]] ; then
     done
 
     # kill the dummy pane that opened the new window
-    [[ ${OMPI_COMM_WORLD_RANK} -eq 0 ]] && tmux kill-pane -t ${dummy} &> /dev/null
+    [[ ${COMM_WORLD_RANK} -eq 0 ]] && tmux kill-pane -t ${dummy} &> /dev/null
 
     # set the window to tiled mode.
     # have to do this after every new pane is spawned because otherwise the splits get
