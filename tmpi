@@ -58,7 +58,7 @@ if [[ ${1} == runmpi ]] ; then
     # start the processes in the order of their rank.
     # this avoids races, as we have to push the variables in tmux' environment.
     # it has the nice side-effect that the panes are also ordered by rank.
-    while [[ $(cat /tmp/tmpi.lock) -ne ${OMPI_COMM_WORLD_RANK} ]] ; do
+    while [[ $(cat ${lockfile}) -ne ${COMM_WORLD_RANK} ]] ; do
         sleep 0.02
     done
 
@@ -89,7 +89,7 @@ if [[ ${1} == runmpi ]] ; then
     tmux select-layout -t ${pane} tiled &> /dev/null
 
     # let the next process start
-    echo $((${OMPI_COMM_WORLD_RANK}+1)) > /tmp/tmpi.lock
+    echo $((${COMM_WORLD_RANK}+1)) > ${lockfile}
 
     # don't exit here as mpirun needs to be kept alive and it would also exit.
     while [[ -d /proc/${pid} ]]; do
@@ -107,15 +107,15 @@ else
     export window=${x[1]}
     export session=${x[2]}
 
+    export lockfile=$(mktemp -t tmpi.lock)
     # syncronize input to all panes.
     tmux set-window-option -t ${window} synchronize-panes on &> /dev/null
     tmux set-window-option -t ${window} remain-on-exit on &> /dev/null
 
     # always start with rank 0.
-    echo 0 > /tmp/tmpi.lock
+    echo 0 > ${lockfile}
 
     # re-execute ourself to spawn of the processes.
     echo mpirun -np ${processes} ${self} runmpi "${@}"
     mpirun -np ${processes} ${self} runmpi "${@}"
 fi
-
